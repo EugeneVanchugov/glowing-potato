@@ -32,5 +32,4 @@ public class ConversationLog {
     public Set<Map.Entry<String, String>> get() {
         return conversationLog.entrySet();
     }
-
 }

@@ -1,8 +1,12 @@
 package com.example.assassistant.service.telegram;
 
 import com.example.assassistant.domain.ConversationLog;
+import com.example.assassistant.domain.GPTFormattedResponse;
+import com.example.assassistant.domain.OpenAIResponse;
 import com.example.assassistant.service.asr.SpeechService;
 import com.example.assassistant.service.openai.OpenAIClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.File;
@@ -55,6 +59,7 @@ public class TelegramAssistantBot {
     public void processVoiceMessage(Update update) {
         Long chatId = update.message().chat().id();
         String audioFileURL = extractAudioFileURL(update);
+
         String recognizedText = speechService.recognizeAudio(audioFileURL);
 
         sendPromptToOpenAI(chatId, recognizedText);
@@ -83,12 +88,10 @@ public class TelegramAssistantBot {
         openAIClient.sendPrompt(userInput)
                 .subscribe(
                         openAIResponse -> {
-                            String gpt3Answer = openAIResponse.choices().get(0).text();
+                            log.info("GPT-3 Answer: {}", openAIResponse);
 
-                            log.info("GPT-3 Answer: {}", gpt3Answer);
-
-                            bot.execute(new SendMessage(chatId, gpt3Answer));
-                            conversationLog.add(userInput, gpt3Answer);
+                            bot.execute(new SendMessage(chatId, openAIResponse.answer()));
+                            conversationLog.add(userInput, openAIResponse.answer());
                         }
                 );
     }

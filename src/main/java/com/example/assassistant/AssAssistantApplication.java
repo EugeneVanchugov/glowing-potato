@@ -27,8 +27,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * <p>
  * Vision of this project:
  * 1. Telegram chat bot to interact with GPT-3 model.
- * 2. Chat bot, that uses prompt engineering build a more specific answer, that could be used to interact with Telegram API.
- * 3. It can receive a voice message, use Google Speech-To-Text API to convert it to text and send to GPT-3 model.
+ * 2. It can receive a voice message, use Google Speech-To-Text API to convert it to text and send to GPT-3 model.
+ * 3. Chat bot, that uses prompt engineering build a more specific answer, that could be used to interact with Telegram API.
  * <p>
  * <p>
  * <p>

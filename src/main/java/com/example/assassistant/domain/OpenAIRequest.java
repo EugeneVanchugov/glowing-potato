@@ -14,10 +14,3 @@ record OpenAIRequest(
         Double presence_penalty
 ) {
 }
-
-record Usage(
-        String prompt_tokens,
-        String completion_tokens,
-        String total_tokens
-) {}
-

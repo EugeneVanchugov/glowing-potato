@@ -14,10 +14,15 @@ public class Configuration {
     public static final String OPENAI_API_KEY = "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";
     public static final String BOT_TOKEN = "6230426113:AAFD5ELkvVnVQGMlrOFU96NE3GpElItgvFo";
     public static final String OPENAI_API = "https://api.openai.com/v1";
+    public static final int AUDIO_CHUNK_SIZE = 1024;
+    public static final int SAMPLE_RATE_HERTZ = 16000;
 
     @Bean
     public WebClient webClient() {
-        return WebClient.create(OPENAI_API);
+        return WebClient.builder()
+                .baseUrl(OPENAI_API)
+                .defaultHeader("Authorization", "Bearer " + Configuration.OPENAI_API_KEY)
+                .build();
     }
 
     @Bean
@@ -26,8 +31,14 @@ public class Configuration {
     }
 
     @Bean
-    public OpenAIClient openAIClient(WebClient webClient, ConversationLog conversationLog) {
-        return new OpenAIClient(webClient, conversationLog);
+    public OpenAIClient openAIClient(
+            WebClient webClient,
+            ConversationLog conversationLog
+    ) {
+        return new OpenAIClient(
+                webClient,
+                conversationLog
+        );
     }
 
     @Bean

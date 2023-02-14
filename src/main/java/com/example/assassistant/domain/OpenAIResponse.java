@@ -11,4 +11,9 @@ record OpenAIResponse(
         List<Choice> choices,
         Usage usage
 ) {
+    record Usage(
+            String prompt_tokens,
+            String completion_tokens,
+            String total_tokens
+    ) {}
 }
