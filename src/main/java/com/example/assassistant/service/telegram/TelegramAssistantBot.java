@@ -1,41 +1,50 @@
 package com.example.assassistant.service.telegram;
 
-import com.example.assassistant.domain.ConversationLog;
 import com.example.assassistant.domain.GPTFormattedResponse;
-import com.example.assassistant.domain.OpenAIResponse;
 import com.example.assassistant.service.asr.SpeechService;
 import com.example.assassistant.service.openai.OpenAIClient;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.assassistant.service.telegram.processor.GPT3ResponseProcessor;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
+import com.pengrad.telegrambot.model.BotCommand;
 import com.pengrad.telegrambot.model.File;
+import com.pengrad.telegrambot.model.MessageEntity;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.GetFile;
 import com.pengrad.telegrambot.request.SendMessage;
+import com.pengrad.telegrambot.request.SetMyCommands;
 import lombok.AllArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
+import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@Slf4j
 @AllArgsConstructor
 public class TelegramAssistantBot {
-    private static final Logger log = LoggerFactory.getLogger(TelegramAssistantBot.class);
-
     private final TelegramBot bot;
     private final OpenAIClient openAIClient;
-    private final ConversationLog conversationLog;
     private final SpeechService speechService;
+    private final GPT3ResponseProcessor<GPTFormattedResponse> responseProcessor;
 
     /**
      * Telegram bot listener that processes incoming messages.
      */
     public void startListening() {
+        bot.execute(new SetMyCommands(
+                new BotCommand("start", "Starts the bot"),
+                new BotCommand("help", "Shows this help message"),
+                new BotCommand("stop", "Stops the bot")
+        ));
+
         bot.setUpdatesListener(updates -> {
             updates.forEach(update -> {
                 if (update.message() == null) {
-                    log.error("Received update without message: {}", update);
+                    log.error("Received an update without message: {}", update);
                     return;
                 }
+
                 // Voice Message
                 if (update.message().voice() != null) {
                     processVoiceMessage(update);
@@ -58,9 +67,9 @@ public class TelegramAssistantBot {
      */
     public void processVoiceMessage(Update update) {
         Long chatId = update.message().chat().id();
-        String audioFileURL = extractAudioFileURL(update);
+        String voiceMessageAudioURL = extractAudioFileURL(update);
 
-        String recognizedText = speechService.recognizeAudio(audioFileURL);
+        String recognizedText = speechService.speechToText(voiceMessageAudioURL);
 
         sendPromptToOpenAI(chatId, recognizedText);
     }
@@ -71,6 +80,14 @@ public class TelegramAssistantBot {
      * @param update Telegram update with text message
      */
     public void processTextInput(Update update) {
+        Arrays.stream(update.message().entities())
+                .forEach(entity -> {
+                    if (entity.type() == MessageEntity.Type.bot_command) {
+                        String command = update.message().text().substring(entity.offset(), entity.offset() + entity.length());
+                        bot.execute(new SendMessage(update.message().chat().id(), "Received command: " + command));
+                    }
+                });
+
         Long chatId = update.message().chat().id();
         String userInputMessage = update.message().text();
 
@@ -85,21 +102,21 @@ public class TelegramAssistantBot {
      * @param userInput User input as string
      */
     private void sendPromptToOpenAI(Long chatId, String userInput) {
-        openAIClient.sendPrompt(userInput)
-                .subscribe(
-                        openAIResponse -> {
-                            log.info("GPT-3 Answer: {}", openAIResponse);
-
-                            bot.execute(new SendMessage(chatId, openAIResponse.answer()));
-                            conversationLog.add(userInput, openAIResponse.answer());
-                        }
-                );
+        openAIClient
+                .sendPrompt(userInput)
+                .subscribe(responseProcessor.process(chatId, userInput));
     }
 
     private String extractAudioFileURL(Update update) {
-        String fileId = update.message().voice().fileId();
+        String fileId = update
+                .message()
+                .voice()
+                .fileId();
 
-        File voiceMessageFile = bot.execute(new GetFile(fileId)).file();
+        File voiceMessageFile = bot
+                .execute(new GetFile(fileId))
+                .file();
+
         return bot.getFullFilePath(voiceMessageFile);
     }
 }

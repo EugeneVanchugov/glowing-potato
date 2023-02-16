@@ -1,10 +1,16 @@
 package com.example.assassistant.config;
 
 import com.example.assassistant.domain.ConversationLog;
+import com.example.assassistant.domain.GPTFormattedResponse;
 import com.example.assassistant.service.asr.GoogleCloudSpeechClient;
 import com.example.assassistant.service.asr.SpeechService;
 import com.example.assassistant.service.openai.OpenAIClient;
+import com.example.assassistant.service.openai.PromptGenerator;
+import com.example.assassistant.service.openai.ResponseParser;
 import com.example.assassistant.service.telegram.TelegramAssistantBot;
+import com.example.assassistant.service.telegram.processor.GPT3ResponseProcessor;
+import com.example.assassistant.service.telegram.processor.SimpleTextProcessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pengrad.telegrambot.TelegramBot;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -31,13 +37,32 @@ public class Configuration {
     }
 
     @Bean
+    public PromptGenerator promptGenerator(ConversationLog conversationLog) {
+        return new PromptGenerator(conversationLog);
+    }
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
+
+    @Bean
+    public ResponseParser responseParser(
+            ObjectMapper objectMapper
+    ) {
+        return new ResponseParser(objectMapper);
+    }
+
+    @Bean
     public OpenAIClient openAIClient(
             WebClient webClient,
-            ConversationLog conversationLog
+            PromptGenerator promptGenerator,
+            ResponseParser responseParser
     ) {
         return new OpenAIClient(
                 webClient,
-                conversationLog
+                promptGenerator,
+                responseParser
         );
     }
 
@@ -57,17 +82,25 @@ public class Configuration {
     }
 
     @Bean
+    public GPT3ResponseProcessor<GPTFormattedResponse> simpleTextProcessor(
+            ConversationLog conversationLog,
+            TelegramBot bot
+    ) {
+        return new SimpleTextProcessor(conversationLog, bot);
+    }
+
+    @Bean
     public TelegramAssistantBot telegramAssistantBot(
             TelegramBot telegramBot,
             OpenAIClient openAIClient,
-            ConversationLog conversationLog,
-            SpeechService speechService
+            SpeechService speechService,
+            GPT3ResponseProcessor<GPTFormattedResponse> simpleTextProcessor
     ) {
         return new TelegramAssistantBot(
                 telegramBot,
                 openAIClient,
-                conversationLog,
-                speechService
+                speechService,
+                simpleTextProcessor
         );
     }
 }
