@@ -1,15 +1,8 @@
 package com.example.assassistant.service.openai;
 
-import com.example.assassistant.domain.GPTFormattedResponse;
-import com.example.assassistant.domain.OpenAIRequest;
-import com.example.assassistant.domain.OpenAIResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.assassistant.domain.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -26,26 +19,39 @@ import java.util.Objects;
 @Slf4j
 @AllArgsConstructor
 public class OpenAIClient {
-    private final WebClient webClient;
+    private final WebClient openAiApi;
     private final PromptGenerator promptGenerator;
     private final ResponseParser responseParser;
 
     public Mono<GPTFormattedResponse> sendPrompt(String userInputMessage) {
         Objects.requireNonNull(userInputMessage, "User input message cannot be null");
 
-        return webClient.post()
-                .uri("/completions")
-                .bodyValue(buildRequest(userInputMessage))
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .bodyToMono(OpenAIResponse.class)
-                .doFirst(() -> log.info("Request to OpenAI API has been sent. User input message: {}", userInputMessage))
-                .doOnNext(response -> log.info("Received response from OpenAI API. Response: {}", response))
-                .doOnError(throwable -> log.error("Error while sending a request to OpenAI API", throwable))
-                .map(responseParser::parseResponse);
+        return sendRequest(
+                openAiApi.post().uri("/completions"),
+                buildPromptRequest(userInputMessage),
+                OpenAIResponse.class
+        ).map(responseParser::parseResponse);
     }
 
-    private OpenAIRequest buildRequest(String userInputMessage) {
+    public Mono<String> generateImage(String prompt) {
+        Objects.requireNonNull(prompt, "Prompt cannot be null");
+
+        return sendRequest(
+                openAiApi.post().uri("/images/generations"),
+                buildImageGenerationRequest(prompt),
+                ImageGenerationResponse.class
+        ).map(it -> it.data().get(0).url());
+    }
+
+    private ImageGenerationRequest buildImageGenerationRequest(String prompt) {
+        return ImageGenerationRequest.builder()
+                .prompt(prompt)
+                .n(1)
+                .size("256x256")
+                .build();
+    }
+
+    private OpenAIRequest buildPromptRequest(String userInputMessage) {
         return OpenAIRequest.builder()
                 .model("text-davinci-003")
                 .prompt(promptGenerator.buildPrompt(userInputMessage))
@@ -55,5 +61,19 @@ public class OpenAIClient {
                 .frequency_penalty(0.0)
                 .presence_penalty(0.0)
                 .build();
+    }
+
+    private <T, V> Mono<T> sendRequest(
+            WebClient.RequestBodySpec responseSpec,
+            V body,
+            Class<T> clazz
+    ) {
+        return responseSpec
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(clazz)
+                .doFirst(() -> log.info("Request to OpenAI API has been sent. Request: {}", body))
+                .doOnNext(response -> log.info("Received response from OpenAI API. Response: {}", response))
+                .doOnError(throwable -> log.error("Error while sending a request to OpenAI API", throwable));
     }
 }

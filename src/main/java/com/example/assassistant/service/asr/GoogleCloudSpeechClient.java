@@ -51,7 +51,6 @@ public class GoogleCloudSpeechClient {
         }
     }
 
-    @NotNull
     private String getTranscript(List<SpeechRecognitionResult> speechRecognitionResults) {
         return speechRecognitionResults
                 .get(0)

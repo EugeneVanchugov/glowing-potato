@@ -2,7 +2,8 @@ package com.example.assassistant.service.telegram.processor;
 
 import com.example.assassistant.domain.ConversationLog;
 import com.example.assassistant.domain.GPTFormattedResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.assassistant.service.telegram.skill.Skill;
+import com.example.assassistant.service.telegram.skill.SkillExecutor;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.request.SendMessage;
 import lombok.RequiredArgsConstructor;
@@ -13,16 +14,18 @@ import java.util.function.Consumer;
 
 @Slf4j
 @RequiredArgsConstructor
-public class SimpleTextProcessor implements GPT3ResponseProcessor<GPTFormattedResponse> {
-    private final ConversationLog conversationLog;
+public class ResponseProcessor {
     private final TelegramBot bot;
+    private final ConversationLog conversationLog;
+    private final SkillExecutor skillExecutor;
 
-    @Override
     @NotNull
     public Consumer<GPTFormattedResponse> process(Long chatId, String userInput) {
         return openAIResponse -> {
             GPTFormattedResponse.Context context = openAIResponse.context();
+            Skill skill = Skill.valueOf(context.action());
 
+            skillExecutor.execute(chatId, skill, context);
 
             bot.execute(new SendMessage(chatId, openAIResponse.answer()));
             conversationLog.add(userInput, openAIResponse.answer());

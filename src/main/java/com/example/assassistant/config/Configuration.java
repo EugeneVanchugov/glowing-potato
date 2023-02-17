@@ -1,15 +1,14 @@
 package com.example.assassistant.config;
 
 import com.example.assassistant.domain.ConversationLog;
-import com.example.assassistant.domain.GPTFormattedResponse;
 import com.example.assassistant.service.asr.GoogleCloudSpeechClient;
 import com.example.assassistant.service.asr.SpeechService;
 import com.example.assassistant.service.openai.OpenAIClient;
 import com.example.assassistant.service.openai.PromptGenerator;
 import com.example.assassistant.service.openai.ResponseParser;
 import com.example.assassistant.service.telegram.TelegramAssistantBot;
-import com.example.assassistant.service.telegram.processor.GPT3ResponseProcessor;
-import com.example.assassistant.service.telegram.processor.SimpleTextProcessor;
+import com.example.assassistant.service.telegram.processor.ResponseProcessor;
+import com.example.assassistant.service.telegram.skill.SkillExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pengrad.telegrambot.TelegramBot;
 import org.springframework.context.annotation.Bean;
@@ -24,10 +23,11 @@ public class Configuration {
     public static final int SAMPLE_RATE_HERTZ = 16000;
 
     @Bean
-    public WebClient webClient() {
+    public WebClient openAiClient() {
         return WebClient.builder()
                 .baseUrl(OPENAI_API)
                 .defaultHeader("Authorization", "Bearer " + Configuration.OPENAI_API_KEY)
+                .defaultHeader("Content-Type", "application/json")
                 .build();
     }
 
@@ -82,11 +82,20 @@ public class Configuration {
     }
 
     @Bean
-    public GPT3ResponseProcessor<GPTFormattedResponse> simpleTextProcessor(
-            ConversationLog conversationLog,
-            TelegramBot bot
+    public SkillExecutor skillExecutor(
+            TelegramBot bot,
+            OpenAIClient openAIClient
     ) {
-        return new SimpleTextProcessor(conversationLog, bot);
+        return new SkillExecutor(bot, openAIClient);
+    }
+
+    @Bean
+    public ResponseProcessor responseProcessor(
+            ConversationLog conversationLog,
+            TelegramBot bot,
+            SkillExecutor skillExecutor
+    ) {
+        return new ResponseProcessor(bot, conversationLog, skillExecutor);
     }
 
     @Bean
@@ -94,13 +103,13 @@ public class Configuration {
             TelegramBot telegramBot,
             OpenAIClient openAIClient,
             SpeechService speechService,
-            GPT3ResponseProcessor<GPTFormattedResponse> simpleTextProcessor
+            ResponseProcessor responseProcessor
     ) {
         return new TelegramAssistantBot(
                 telegramBot,
                 openAIClient,
                 speechService,
-                simpleTextProcessor
+                responseProcessor
         );
     }
 }

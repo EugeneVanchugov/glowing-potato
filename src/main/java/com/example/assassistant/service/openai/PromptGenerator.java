@@ -1,9 +1,12 @@
 package com.example.assassistant.service.openai;
 
 import com.example.assassistant.domain.ConversationLog;
+import com.example.assassistant.service.telegram.skill.Skill;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Arrays;
 
 @Slf4j
 @AllArgsConstructor
@@ -46,9 +49,15 @@ public class PromptGenerator {
         prompt.append("If there's no action to be parsed from my input, the context object should be null.\n");
 
         prompt.append("The action - is the one of the following:\n");
-        prompt.append("1. `GenerateImage` - to generate an image.\n");
+        Arrays.stream(Skill.values())
+                .forEach(skill -> prompt
+                        .append(skill.name())
+                        .append(" - ")
+                        .append(skill.getDescription())
+                        .append("\n")
+                );
 
-        prompt.append("Action `GenerateImage` has the following parameters:\n");
+        prompt.append("Action `").append(Skill.GENERATE_IMAGE.name()).append("` has the following parameters:\n");
         prompt.append("1. `prompt` - the prompt for the image generation.\n");
 
         prompt.append("I want you to remember the context of our conversation.\n");

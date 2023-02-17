@@ -3,22 +3,14 @@ package com.example.assassistant.service.telegram;
 import com.example.assassistant.domain.GPTFormattedResponse;
 import com.example.assassistant.service.asr.SpeechService;
 import com.example.assassistant.service.openai.OpenAIClient;
-import com.example.assassistant.service.telegram.processor.GPT3ResponseProcessor;
+import com.example.assassistant.service.telegram.processor.ResponseProcessor;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
-import com.pengrad.telegrambot.model.BotCommand;
 import com.pengrad.telegrambot.model.File;
-import com.pengrad.telegrambot.model.MessageEntity;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.GetFile;
-import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.request.SetMyCommands;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Arrays;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Slf4j
 @AllArgsConstructor
@@ -26,18 +18,12 @@ public class TelegramAssistantBot {
     private final TelegramBot bot;
     private final OpenAIClient openAIClient;
     private final SpeechService speechService;
-    private final GPT3ResponseProcessor<GPTFormattedResponse> responseProcessor;
+    private final ResponseProcessor responseProcessor;
 
     /**
      * Telegram bot listener that processes incoming messages.
      */
     public void startListening() {
-        bot.execute(new SetMyCommands(
-                new BotCommand("start", "Starts the bot"),
-                new BotCommand("help", "Shows this help message"),
-                new BotCommand("stop", "Stops the bot")
-        ));
-
         bot.setUpdatesListener(updates -> {
             updates.forEach(update -> {
                 if (update.message() == null) {
@@ -80,14 +66,6 @@ public class TelegramAssistantBot {
      * @param update Telegram update with text message
      */
     public void processTextInput(Update update) {
-        Arrays.stream(update.message().entities())
-                .forEach(entity -> {
-                    if (entity.type() == MessageEntity.Type.bot_command) {
-                        String command = update.message().text().substring(entity.offset(), entity.offset() + entity.length());
-                        bot.execute(new SendMessage(update.message().chat().id(), "Received command: " + command));
-                    }
-                });
-
         Long chatId = update.message().chat().id();
         String userInputMessage = update.message().text();
 

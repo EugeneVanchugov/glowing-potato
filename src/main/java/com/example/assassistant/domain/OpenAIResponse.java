@@ -11,7 +11,15 @@ record OpenAIResponse(
         List<Choice> choices,
         Usage usage
 ) {
-    record Usage(
+    public record Choice(
+            String text,
+            Integer index,
+            String logprobs,
+            String finish_reason
+    ) {
+    }
+
+    public record Usage(
             String prompt_tokens,
             String completion_tokens,
             String total_tokens
