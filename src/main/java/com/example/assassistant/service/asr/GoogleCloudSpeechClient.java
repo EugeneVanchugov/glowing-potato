@@ -4,9 +4,7 @@ import com.google.cloud.speech.v1.*;
 import com.google.cloud.speech.v1.RecognitionConfig.AudioEncoding;
 import com.google.protobuf.ByteString;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.List;
@@ -17,41 +15,44 @@ import static com.example.assassistant.config.Configuration.SAMPLE_RATE_HERTZ;
 
 @Slf4j
 public class GoogleCloudSpeechClient {
-    private final List<String> languageCodes = List.of("en-US", "ru-RU");
+    private final List<String> languageCodes = List.of(
+            "ru-RU"
+    );
     private final RecognitionConfig config = RecognitionConfig.newBuilder()
-            .setEncoding(AudioEncoding.WEBM_OPUS)
-            .addAllAlternativeLanguageCodes(languageCodes)
+            .setEncoding(AudioEncoding.OGG_OPUS)
             .setSampleRateHertz(SAMPLE_RATE_HERTZ)
+            .addAlternativeLanguageCodes("ru-RU")
             .build();
 
-    public String recognizeAudio(byte[] audioData) {
+    public Mono<String> recognizeAudio(byte[] audioData) {
         Objects.requireNonNull(audioData, "Audio data must not be null");
 
-        ByteString audioByteString = ByteString.copyFrom(audioData);
-
         try (SpeechClient speechClient = SpeechClient.create()) {
-            // Builds the sync recognize request
-            RecognitionAudio audio = RecognitionAudio.newBuilder()
-                    .setContent(audioByteString)
-                    .build();
-
-            // Performs speech recognition on the audio data
-            RecognizeResponse response = speechClient.recognize(config, audio);
-
-            return Optional.of(response.getResultsList())
-                    .stream()
-                    .filter(it -> !it.isEmpty())
-                    .map(this::getTranscript)
-                    .peek(it -> log.info("Recognized text: {}", it))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException("No speech recognized"));
+            return Mono.just(
+                    speechClient.recognize(
+                            config,
+                            // Builds the sync recognize request
+                            RecognitionAudio.newBuilder()
+                                    .setContent(ByteString.copyFrom(audioData))
+                                    .build()
+                    )).map(this::processResponse);
         } catch (IOException e) {
             log.error("Error while recognizing audio");
             throw new RuntimeException(e);
         }
     }
 
-    private String getTranscript(List<SpeechRecognitionResult> speechRecognitionResults) {
+    private String processResponse(RecognizeResponse response) {
+        return Optional.of(response.getResultsList())
+                .stream()
+                .filter(it -> !it.isEmpty())
+                .map(this::extractRecognizedText)
+                .peek(it -> log.info("Recognized text: {}", it))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No speech recognized"));
+    }
+
+    private String extractRecognizedText(List<SpeechRecognitionResult> speechRecognitionResults) {
         return speechRecognitionResults
                 .get(0)
                 .getAlternativesList()

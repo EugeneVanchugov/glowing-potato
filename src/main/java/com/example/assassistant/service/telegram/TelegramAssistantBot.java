@@ -1,25 +1,25 @@
 package com.example.assassistant.service.telegram;
 
-import com.example.assassistant.domain.GPTFormattedResponse;
-import com.example.assassistant.service.asr.SpeechService;
-import com.example.assassistant.service.openai.OpenAIClient;
-import com.example.assassistant.service.telegram.processor.ResponseProcessor;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.File;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.GetFile;
+import com.pengrad.telegrambot.request.GetUpdates;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Telegram Bot Assistant entry point.
+ * <p>
+ *     This class is responsible for listening to incoming messages from Telegram bot API.
+ *     This is the entry point for all incoming messages.
+ */
 @Slf4j
 @AllArgsConstructor
 public class TelegramAssistantBot {
     private final TelegramBot bot;
-    private final OpenAIClient openAIClient;
-    private final SpeechService speechService;
-    private final ResponseProcessor responseProcessor;
-
+    private final UpdateProcessor updateProcessor;
     /**
      * Telegram bot listener that processes incoming messages.
      */
@@ -32,59 +32,31 @@ public class TelegramAssistantBot {
                 }
 
                 // Voice Message
-                if (update.message().voice() != null) {
-                    processVoiceMessage(update);
-                }
+//                if (update.message().voice() != null) {
+//                    Long chatId = update.message().chat().id();
+//                    String voiceMessageAudioURL = extractAudioFileURL(update);
+//
+//                    updateProcessor.processVoiceMessage(chatId, voiceMessageAudioURL);
+//                }
 
                 // Text Message
                 if (update.message().text() != null) {
-                    processTextInput(update);
+                    Long chatId = update.message().chat().id();
+                    String userInputMessage = update.message().text();
+
+                    updateProcessor.processTextInput(chatId, userInputMessage);
                 }
             });
             return UpdatesListener.CONFIRMED_UPDATES_ALL;
-        });
+        }, new GetUpdates().offset(0));
     }
 
     /**
-     * Extracts voice from incoming Telegram message and sends it to Google Cloud Speech API for Speech-to-Text conversion.
-     * Then sends the recognized text to OpenAI API for GPT-3 processing.
+     * Extracts the audio file URL from the Telegram update.
      *
      * @param update Telegram update with voice message
+     * @return Audio file URL
      */
-    public void processVoiceMessage(Update update) {
-        Long chatId = update.message().chat().id();
-        String voiceMessageAudioURL = extractAudioFileURL(update);
-
-        String recognizedText = speechService.speechToText(voiceMessageAudioURL);
-
-        sendPromptToOpenAI(chatId, recognizedText);
-    }
-
-    /**
-     * Sends the text from incoming Telegram message to OpenAI API for GPT-3 processing.
-     *
-     * @param update Telegram update with text message
-     */
-    public void processTextInput(Update update) {
-        Long chatId = update.message().chat().id();
-        String userInputMessage = update.message().text();
-
-        sendPromptToOpenAI(chatId, userInputMessage);
-    }
-
-    /**
-     * Sends the prompt to OpenAI API for GPT-3 processing.
-     * Subscribes to the Mono<OpenAIResponse> and sends the answer to the Telegram chat.
-     *
-     * @param chatId    Telegram chat ID
-     * @param userInput User input as string
-     */
-    private void sendPromptToOpenAI(Long chatId, String userInput) {
-        openAIClient
-                .sendPrompt(userInput)
-                .subscribe(responseProcessor.process(chatId, userInput));
-    }
-
     private String extractAudioFileURL(Update update) {
         String fileId = update
                 .message()

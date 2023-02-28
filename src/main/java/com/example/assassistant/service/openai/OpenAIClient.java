@@ -2,11 +2,12 @@ package com.example.assassistant.service.openai;
 
 import com.example.assassistant.domain.*;
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.Objects;
+import static com.example.assassistant.config.Configuration.IMAGE_SIZE;
 
 /**
  * OpenAI API client.
@@ -23,32 +24,57 @@ public class OpenAIClient {
     private final PromptGenerator promptGenerator;
     private final ResponseParser responseParser;
 
-    public Mono<GPTFormattedResponse> sendPrompt(String userInputMessage) {
-        Objects.requireNonNull(userInputMessage, "User input message cannot be null");
-
+    /**
+     * Sends a prompt, built from user input, to OpenAI API.
+     * Receives a response from OpenAI API and parses it to {@link GPTFormattedResponse}.
+     *
+     * @param userInput User input as string
+     * @return the {@link Mono} with the {@link GPTFormattedResponse} object, that contains the answer from GPT-3 model.
+     */
+    public Mono<GPTFormattedResponse> sendPrompt(@NonNull String userInput) {
         return sendRequest(
                 openAiApi.post().uri("/completions"),
-                buildPromptRequest(userInputMessage),
+                buildPromptRequest(userInput),
                 OpenAIResponse.class
         ).map(responseParser::parseResponse);
     }
 
-    public Mono<String> generateImage(String prompt) {
-        Objects.requireNonNull(prompt, "Prompt cannot be null");
-
+    /**
+     * Sends an image generation prompt, extracted from user input, to OpenAI API.
+     * Receives a response from OpenAI API and extracts the image URL from it.
+     *
+     * @param prompt an image generation prompt.
+     * @return the {@link Mono} with the image URL as string.
+     */
+    public Mono<String> generateImage(@NonNull String prompt) {
         return sendRequest(
                 openAiApi.post().uri("/images/generations"),
                 buildImageGenerationRequest(prompt),
                 ImageGenerationResponse.class
-        ).map(it -> it.data().get(0).url());
+        ).map(this::extractUrlString);
     }
 
-    private ImageGenerationRequest buildImageGenerationRequest(String prompt) {
-        return ImageGenerationRequest.builder()
-                .prompt(prompt)
-                .n(1)
-                .size("256x256")
-                .build();
+    /**
+     * Wrapper method for sending requests to OpenAI API.
+     *
+     * @param requestBodySpec OpenAI API method and endpoint to send the request to.
+     * @param body            Request body.
+     * @param clazz           Class of the response object.
+     * @param <T>             Type of the response object.
+     * @return the {@link Mono} with the response object.
+     */
+    private <T> Mono<T> sendRequest(
+            WebClient.RequestBodySpec requestBodySpec,
+            Object body,
+            Class<T> clazz
+    ) {
+        return requestBodySpec
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(clazz)
+                .doFirst(() -> log.info("Request to OpenAI API has been sent. Request: {}", body))
+                .doOnNext(response -> log.info("Received response from OpenAI API. Response: {}", response))
+                .doOnError(throwable -> log.error("Error while sending a request to OpenAI API", throwable));
     }
 
     private OpenAIRequest buildPromptRequest(String userInputMessage) {
@@ -63,17 +89,15 @@ public class OpenAIClient {
                 .build();
     }
 
-    private <T, V> Mono<T> sendRequest(
-            WebClient.RequestBodySpec responseSpec,
-            V body,
-            Class<T> clazz
-    ) {
-        return responseSpec
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(clazz)
-                .doFirst(() -> log.info("Request to OpenAI API has been sent. Request: {}", body))
-                .doOnNext(response -> log.info("Received response from OpenAI API. Response: {}", response))
-                .doOnError(throwable -> log.error("Error while sending a request to OpenAI API", throwable));
+    private ImageGenerationRequest buildImageGenerationRequest(String prompt) {
+        return ImageGenerationRequest.builder()
+                .prompt(prompt)
+                .n(1)
+                .size(IMAGE_SIZE)
+                .build();
+    }
+
+    private String extractUrlString(ImageGenerationResponse imageGenerationResponse) {
+        return imageGenerationResponse.data().get(0).url();
     }
 }

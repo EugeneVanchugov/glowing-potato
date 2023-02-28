@@ -2,8 +2,7 @@ package com.example.assassistant.service.asr;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,15 +17,14 @@ import static com.example.assassistant.config.Configuration.AUDIO_CHUNK_SIZE;
 public class SpeechService {
     private final GoogleCloudSpeechClient speechClient;
 
-    public String speechToText(String audioFileURL) {
+    public Mono<String> speechToText(String audioFileURL) {
         Objects.requireNonNull(audioFileURL, "Audio File URL must not be null");
-
         log.info("Recognize voice message from URL: " + audioFileURL);
 
         return speechClient.recognizeAudio(readAudioFromURL(audioFileURL));
     }
 
-    private static byte[] readAudioFromURL(String audioUrl) {
+    private byte[] readAudioFromURL(String audioUrl) {
         try (
                 InputStream inputStream = new URL(audioUrl).openStream();
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream()

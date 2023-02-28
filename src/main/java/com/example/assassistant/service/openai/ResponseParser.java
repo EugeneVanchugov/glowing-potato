@@ -5,6 +5,7 @@ import com.example.assassistant.domain.OpenAIResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -14,6 +15,7 @@ public class ResponseParser {
 
     public GPTFormattedResponse parseResponse(OpenAIResponse openAIResponse) {
         String content = openAIResponse.choices().get(0).text();
+
         try {
             return objectMapper.readValue(content, GPTFormattedResponse.class);
         } catch (JsonProcessingException e) {

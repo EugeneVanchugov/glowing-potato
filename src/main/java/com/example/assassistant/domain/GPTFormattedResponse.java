@@ -8,8 +8,8 @@ import java.util.List;
  * {
  *      "answer": <GPT-3 model answer>,
  *      "context": {
- *          "action": <action name to perform as a Virtual Assistant>,
- *          "parameters": [ <parameters for the action> ]
+ *          "skill": <skill name to perform as a Virtual Assistant>,
+ *          "parameters": [ <parameters for the skill> ]
  *      }
  * }
  */
@@ -19,7 +19,7 @@ public record GPTFormattedResponse(
         Context context
 ) {
     public record Context(
-            String action,
+            String skill,
             List<Parameter> parameters
     ) {
         public record Parameter(
